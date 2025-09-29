@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>3D Р С™Р В°РЎР‚РЎС“РЎРѓР ВµР В»РЎРЉ РІР‚вЂќ РЎвЂ¦Р С•РЎвЂљР С—Р С•Р С‘Р Р…РЎвЂљРЎвЂ№ Р С‘ Р Р†РЎРѓР С—Р В»РЎвЂ№Р Р†Р В°РЎР‹РЎвЂ°Р ВµР Вµ Р С•Р С”Р Р…Р С•</title>
+<link rel="icon" href="data:,">
+<style>
+  :root{ --bg:#f6f7fb; --ink:#111 }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,Arial}
+  /* Portrait-first stage sized by height (2160x3840 target) */
+  #wrap{
+    position:relative;
+    /* Fill viewport height, but never exceed reference 3840px */
+    height:min(100dvh, 3840px);
+    /* Maintain 9:16 portrait aspect; width derives from height */
+    aspect-ratio:9/16;
+    /* Cap width to 2160px when on ultra-tall screens */
+    max-width:2160px;
+    width:auto;
+    margin:0 auto; /* center horizontally on landscape displays */
+    background:var(--bg);
+    overflow:hidden;
+  }
+  #webgl{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
+  /* 3D "Нажми" button styled like a keyboard Enter key */
+  #neonPress,
+  #ctaButton{
+    position:absolute; left:50%; transform:translate(-50%,0);
+    z-index:4;
+    display:inline-flex; align-items:center; justify-content:center;
+    padding: 8px 20px; min-width: 140px; min-height: 36px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #0bbcff 0%, #0567ff 100%);
+    border: none;
+    color:#fff; font-weight:400; letter-spacing:.01em; text-transform:none;
+    font-size: clamp(13px, 2.0vh, 18px);
+    box-shadow:0 10px 22px rgba(11,92,255,0.28);
+    cursor:pointer;
+    -webkit-user-select:none; user-select:none;
+    opacity:0; pointer-events:none; transition:opacity .35s ease, transform .25s ease;
+  }
+  #neonPress{ top:58%; }
+  #ctaButton{ top:60%; }
+  #neonPress.show,
+  #ctaButton.show{ opacity:1; pointer-events:auto; }
+  #neonPress:active,
+  #ctaButton:active{ transform:translate(-50%,2px) scale(0.98); }
+  /* Р СљР С•Р Т‘Р В°Р В»Р С”Р В° */
+  .modal-backdrop{
+    position:absolute; inset:0; z-index:5;
+    
+    display:none; align-items:center; justify-content:center;
+    padding:16px;
+  }
+  .modal-backdrop.show{ display:flex; }
+  .modal-box{
+    width:min(520px, calc(100% - 32px));
+    background:#fff;border-radius:16px;padding:18px 20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);
+    color:#111; position:relative;
+  }
+  .modal-box h3{margin:0 0 8px 0;font-size:18px}
+  .modal-box p{margin:0 0 14px 0;color:#444}
+  .modal-close{
+    position:absolute; top:10px; right:10px; width:32px; height:32px;
+    border:none; border-radius:8px; background:#f2f3f7; cursor:pointer;
+    font-size:18px; line-height:1;
+  }
+  #hint{ display:none !important; }
+  /* Semi-transparent plaque image above active object */
+  .plaque{
+    position:absolute; z-index:4; display:none;
+    transform: translate(-50%, -110%);
+    /* size relative to stage; adjust as needed */
+    width:min(600px, calc(100% - 64px));
+    height:auto;
+    opacity:.75; pointer-events:none; user-select:none;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,.25));
+  }
+  /* Video modal tweak for iframe */
+  .modal-box.video{ width:min(860px, calc(100% - 32px)); padding:10px; }
+  .modal-box iframe{ width:100%; aspect-ratio:16/9; height:auto; border:0; border-radius:12px; background:#000 }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="webgl"></canvas>
+    <div id="neonPress">Р СњР В°Р В¶Р СР С‘</div>
+    <img id="plaque" class="plaque" src="1.png" alt="" />
+    <button id="ctaButton" class="cta-button" type="button">Оформить</button>
+    <div id="hint">Р РЋР Р†Р В°Р в„–Р С—Р В°Р в„– Р С—Р С•Р Т‘РЎР‚РЎРЏР Т‘ (Р Р†Р В»Р ВµР Р†Р С•/Р Р†Р С—РЎР‚Р В°Р Р†Р С•). Р СњР В°Р В¶Р СР С‘ Р Р…Р В° РІвЂњВ РІР‚вЂќ Р Р†РЎРѓР С—Р В»РЎвЂ№Р Р†Р В°РЎР‹РЎвЂ°Р ВµР Вµ Р С•Р С”Р Р…Р С•.</div>
+    <!-- Р СљР С•Р Т‘Р В°Р В»Р С”Р В° -->
+    <div id="modal" class="modal-backdrop">
+      <div class="modal-box">
+        <button class="modal-close" aria-label="Р вЂ”Р В°Р С”РЎР‚РЎвЂ№РЎвЂљРЎРЉ">РІСљвЂў</button>
+        <h3 id="modalTitle">Р вЂ”Р В°Р С–Р С•Р В»Р С•Р Р†Р С•Р С”</h3>
+        <p id="modalDesc">Р С›Р С—Р С‘РЎРѓР В°Р Р…Р С‘Р Вµ Р С•Р В±РЎР‰Р ВµР С”РЎвЂљР В°.</p>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import TWEEN, { Easing } from 'https://unpkg.com/@tweenjs/tween.js@18.6.4/dist/tween.esm.js';
+
+const wrap = document.getElementById('wrap');
+const canvas = document.getElementById('webgl');
+const plaqueEl = document.getElementById('plaque');
+const neonPress = document.getElementById('neonPress');
+let plaqueItem = null; // currently active item for plaque
+const ctaButton = document.getElementById('ctaButton');
+let ctaReady = false;
+let ctaTriggered = false;
+const particleSystems = [];
+let swayEnabled = true;
+const tmpMatrix4 = new THREE.Matrix4();
+
+
+// Fix initial Russian text and remove bottom hint if present
+try{ if (neonPress) neonPress.textContent = 'Подключить Premium'; }catch{}
+const hintEl = document.getElementById('hint'); if (hintEl) hintEl.remove();
+
+function hidePlaque(){
+  plaqueItem = null;
+  if (plaqueEl) plaqueEl.style.display = 'none';
+}
+
+function togglePlaqueIndex(i){
+  const item = items[i];
+  if (!item) return;
+  if (plaqueItem === item){ hidePlaque(); return; }
+  plaqueItem = item;
+  if (plaqueEl) plaqueEl.style.display = 'block';
+}
+
+// --- Renderer
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.setClearColor(0xf6f7fb, 1);
+
+// --- Scene & Camera
+const scene = new THREE.Scene();
+// Keep background transparent; HDRI отключено
+scene.background = null;
+scene.fog = new THREE.Fog(0xf6f7fb, 60, 140);
+
+const camera = new THREE.PerspectiveCamera(35, 9/16, 0.1, 200);
+camera.position.set(0, 1.6, 8);
+scene.add(camera);
+
+// --- Lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+const spotLight = new THREE.SpotLight(0x4972cf, 8.0, 22, THREE.MathUtils.degToRad(52), 0.35, 2.5);
+spotLight.name = 'boxSpotLight';
+spotLight.position.set(0, 3.2, 4.1);
+spotLight.castShadow = true;
+spotLight.shadow.mapSize.set(1024, 1024);
+spotLight.shadow.bias = -0.00035;
+spotLight.shadow.normalBias = 0.05;
+scene.add(spotLight);
+
+const spotTarget = new THREE.Object3D();
+spotTarget.position.set(0, 1.0, -2.6);
+scene.add(spotTarget);
+spotLight.target = spotTarget;
+
+const tmpFrontBox = new THREE.Box3();
+const tmpFrontCenter = new THREE.Vector3();
+
+function updateSpotlightForFront(){
+  const front = items[0];
+  if (!front?.content || !spotLight || !spotTarget) return;
+  front.root.updateWorldMatrix(true, true);
+  tmpFrontBox.makeEmpty();
+  tmpFrontBox.setFromObject(front.content);
+  if (tmpFrontBox.isEmpty()){
+    front.content.getWorldPosition(tmpFrontCenter);
+  } else {
+    tmpFrontBox.getCenter(tmpFrontCenter);
+  }
+  spotTarget.position.copy(tmpFrontCenter);
+  spotTarget.position.y += (tmpFrontBox.getSize(new THREE.Vector3()).y || 1) * 0.15;
+  spotLight.target.updateMatrixWorld(true);
+}
+
+// IBL
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+const HDRI_URL = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr';
+let envRenderTarget = null;
+let envTexture = null;
+
+scene.environment = null;
+const ENV_PARAMS = { intensity: 1.0, rotX: 0, rotY: 0, rotZ: 0 };
+function applyEnvParamsToMaterial(mat){
+  if (!mat) return;
+  if ('envMapIntensity' in mat) mat.envMapIntensity = ENV_PARAMS.intensity;
+  // Rotation support (available in newer three versions). Falls back silently.
+  if ('envMapRotation' in mat && mat.envMapRotation && typeof mat.envMapRotation.set === 'function'){
+    mat.envMapRotation.set(ENV_PARAMS.rotX, ENV_PARAMS.rotY, ENV_PARAMS.rotZ);
+  }
+  mat.needsUpdate = true;
+}
+function applyEnvParams(root){
+  if (!root) return;
+  root.traverse(n=>{
+    const m = n && n.material;
+    if (n.isMesh && m){
+      if (Array.isArray(m)) m.forEach(applyEnvParamsToMaterial); else applyEnvParamsToMaterial(m);
+    }
+  });
+}
+function updateEnvLightingParams(){
+  if ('environmentIntensity' in scene) scene.environmentIntensity = ENV_PARAMS.intensity;
+  applyEnvParams(scene);
+}
+// Expose to window for quick tuning
+window.setHdriParams = (opts={})=>{
+  if (typeof opts.intensity === 'number') ENV_PARAMS.intensity = opts.intensity;
+  updateEnvLightingParams();
+};
+
+function loadHdriEnvironment(url = HDRI_URL){
+  new RGBELoader()
+    .setDataType(THREE.FloatType)
+    .load(url,
+      (hdrTexture)=>{
+        envRenderTarget?.texture?.dispose?.();
+        envRenderTarget?.dispose?.();
+        envTexture?.dispose?.();
+
+        envRenderTarget = pmremGenerator.fromEquirectangular(hdrTexture);
+        envTexture = envRenderTarget.texture;
+        scene.environment = envTexture;
+        hdrTexture.dispose();
+        updateEnvLightingParams();
+      },
+      undefined,
+      (err)=>console.warn('HDRI load error:', err)
+    );
+}
+
+loadHdriEnvironment();
+
+// --- Intro: logo.glb pulse + fly to corner ---
+let introDone = false;
+let introAnimating = false;
+const introGroup = new THREE.Group();
+camera.add(introGroup); // keep in view space
+// Raise the start-screen logo higher
+introGroup.position.set(0, 0.0, -3);
+introGroup.visible = false;
+
+const gltfLoader = new GLTFLoader();
+
+function startPulse(target){
+  const s0 = { s:1.0 };
+  return new TWEEN.Tween(s0)
+    .to({ s:1.08 }, 900)
+    .yoyo(true)
+    .repeat(Infinity)
+    .easing(Easing.Sinusoidal.InOut)
+    .onUpdate(()=>{ target.scale.setScalar(s0.s); })
+    .start();
+}
+
+let pulseTween = null;
+let logoObj = null;
+let logoSpinTween = null;
+let logoSpinTimeout = null;
+const LOGO_SPIN_DURATION = 2500;
+const LOGO_SPIN_PERIOD = 10000;
+
+function stopLogoSpin(){
+  if (logoSpinTween){ logoSpinTween.stop(); logoSpinTween = null; }
+  if (logoSpinTimeout){ clearTimeout(logoSpinTimeout); logoSpinTimeout = null; }
+}
+
+function startLogoSpinLoop(){
+  if (!logoObj) return;
+  stopLogoSpin();
+  const startY = logoObj.rotation.y;
+  const target = startY + Math.PI * 2;
+  const state = { y: startY };
+  logoSpinTween = new TWEEN.Tween(state)
+    .to({ y: target }, LOGO_SPIN_DURATION)
+    .easing(Easing.Linear.None)
+    .onUpdate(()=>{ logoObj.rotation.y = state.y; })
+    .onComplete(()=>{
+      logoObj.rotation.y = target % (Math.PI * 2);
+      logoSpinTween = null;
+      const delay = Math.max(0, LOGO_SPIN_PERIOD - LOGO_SPIN_DURATION);
+      logoSpinTimeout = setTimeout(()=>{ logoSpinTimeout = null; startLogoSpinLoop(); }, delay);
+    })
+    .start();
+}
+// Mixers for any GLTF animations (e.g., embedded logo animation)
+const mixers = [];
+gltfLoader.load('logo.glb', (gltf)=>{
+  logoObj = (gltf.scene || gltf.scenes?.[0]);
+  normalizeBottomCenter(logoObj, 0.45);
+  introGroup.add(logoObj);
+  introGroup.visible = true;
+  // Start smaller (2x smaller than current sizing)
+  introGroup.scale.setScalar(0.8);
+  neonPress?.classList.add('show');
+  // Start subtle pulse and any built-in GLB animations together
+  pulseTween = startPulse(logoObj);
+  startLogoSpinLoop();
+  if (gltf.animations && gltf.animations.length){
+    const mixer = new THREE.AnimationMixer(logoObj);
+    gltf.animations.forEach(clip=>{
+      const action = mixer.clipAction(clip);
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.play();
+    });
+    mixers.push(mixer);
+  }
+}, undefined, (err)=>console.warn('Logo load error:', err));
+
+function runIntro(){
+  if (introDone || introAnimating || !introGroup.visible) return;
+  introAnimating = true;
+  neonPress?.classList.remove('show');
+  if (pulseTween){ pulseTween.stop(); pulseTween = null; logoObj?.scale.setScalar(1.0); }
+  const rot = { y:0 };
+  const pos = { x:introGroup.position.x, y:introGroup.position.y };
+  // Scale from current size to 3x smaller while flying
+  const sc  = { s:introGroup.scale.x };
+  new TWEEN.Tween(rot).to({ y:Math.PI*2 }, 3000).easing(Easing.Cubic.InOut)
+    .onUpdate(()=>{ introGroup.rotation.y = rot.y; })
+    .start();
+  new TWEEN.Tween(pos).to({ x:0.35, y:0.7 }, 3000).easing(Easing.Cubic.InOut)
+    .onUpdate(()=>{ introGroup.position.x = pos.x; introGroup.position.y = pos.y; })
+    .onComplete(()=>{
+      introAnimating = false; introDone = true; center.visible = true;
+      swayEnabled = true;
+      if (ctaButton && !ctaTriggered) ctaButton.classList.add('show');
+    })
+    .start();
+  new TWEEN.Tween(sc).to({ s: introGroup.scale.x / 3 }, 3000).easing(Easing.Cubic.InOut)
+    .onUpdate(()=>{ introGroup.scale.setScalar(sc.s); })
+    .start();
+}
+// ---------- Р С™Р С’Р В Р Р€Р РЋР вЂўР вЂєР В¬ ----------
+const files = ['1.glb','2.glb','3.glb','4.glb','5.glb','6.glb','7.glb']; // РЎР‚РЎРЏР Т‘Р С•Р С РЎРѓ index.html
+const N = files.length;
+const RADIUS = 1.0;
+// Raise the ring slightly higher in the scene
+const HUB_Y  = 1.75;
+const FRONT_SCALE = 5.0;
+const BACK_SCALE  = 1.5;
+const STEP_ANGLE  = (Math.PI * 2) / N;
+const FRONT_ANGLE = 0;
+const ANIM_MS     = 600;
+
+function slot(k){
+  const ang = FRONT_ANGLE + k * STEP_ANGLE;
+  const x = Math.sin(ang) * RADIUS;
+  const z = Math.cos(ang) * RADIUS;
+  const scale = (k === 0) ? FRONT_SCALE : BACK_SCALE;
+  return { pos:new THREE.Vector3(x, HUB_Y, z), rotY: -ang, scale };
+}
+
+const center = new THREE.Group();
+scene.add(center);
+center.visible = false;
+center.position.y = 0.8;
+
+// РЎРЊР В»Р ВµР СР ВµР Р…РЎвЂљРЎвЂ№
+let items = []; // [{root, base, swayPhase, hotY}]
+const initialOrder = []; // preserves original order for idle reset
+const placeholderMat = new THREE.MeshStandardMaterial({ color:0x6a8dff, roughness:0.35, metalness:0.2 });
+const placeholderGeo = new THREE.BoxGeometry(0.9,0.9,0.9);
+
+const PEDESTAL_OFFSET_Y = -HUB_Y + 1.53; // +0.07 higher pedestals
+const PEDESTAL_SCALE = 1/3;
+let pedestalTemplate = null;
+let pedestalClips = [];
+
+function cloneDeep(object){
+  if (!object) return null;
+  if (SkeletonUtils && typeof SkeletonUtils.clone === 'function') return SkeletonUtils.clone(object);
+  if (SkeletonUtils?.SkeletonUtils && typeof SkeletonUtils.SkeletonUtils.clone === 'function') return SkeletonUtils.SkeletonUtils.clone(object);
+  return object.clone(true);
+}
+
+const dissolveNoiseTexture = createDissolveNoiseTexture();
+const DISSOLVE_DEFAULT_EDGE_WIDTH = 0.08;
+
+function createDissolveNoiseTexture(size = 128){
+  const data = new Uint8Array(size * size);
+  for (let i=0; i<data.length; i++) data[i] = Math.floor(Math.random() * 255);
+  const texture = new THREE.DataTexture(data, size, size, THREE.RedFormat);
+  texture.colorSpace = THREE.NoColorSpace ?? THREE.LinearSRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.magFilter = texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function wrapMaterialWithDissolve(material, { edgeColor = 0xffffff, noiseScale = 0.6, edgeWidth = DISSOLVE_DEFAULT_EDGE_WIDTH } = {}){
+  if (!material) return null;
+  if (material.userData?.dissolveWrapper) return material.userData.dissolveWrapper;
+  const edge = new THREE.Color(edgeColor);
+  const uniforms = {
+    uDissolveProgress: { value: 0 },
+    uNoiseTex: { value: dissolveNoiseTexture },
+    uNoiseScale: { value: noiseScale },
+    uEdgeColor: { value: edge },
+    uEdgeWidth: { value: edgeWidth }
+  };
+  const originalCompile = material.onBeforeCompile;
+  material.onBeforeCompile = (shader)=>{
+    shader.uniforms.uDissolveProgress = uniforms.uDissolveProgress;
+    shader.uniforms.uNoiseTex = uniforms.uNoiseTex;
+    shader.uniforms.uNoiseScale = uniforms.uNoiseScale;
+    shader.uniforms.uEdgeColor = uniforms.uEdgeColor;
+    shader.uniforms.uEdgeWidth = uniforms.uEdgeWidth;
+
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <common>',
+      '#include <common>\nvarying vec3 vWorldPosition;'
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\nvec4 worldPosition = modelMatrix * vec4( transformed, 1.0 );\nvWorldPosition = worldPosition.xyz;'
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      '#include <common>\nvarying vec3 vWorldPosition;\nuniform sampler2D uNoiseTex;\nuniform float uDissolveProgress;\nuniform float uNoiseScale;\nuniform vec3 uEdgeColor;\nuniform float uEdgeWidth;'
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <output_fragment>',
+      'float noiseValue = texture2D(uNoiseTex, vWorldPosition.xy * uNoiseScale).r;\nfloat cutoff = uDissolveProgress;\nif (noiseValue < cutoff - uEdgeWidth) { discard; }\nfloat edgeFactor = smoothstep(cutoff - uEdgeWidth, cutoff, noiseValue);\ndiffuseColor.rgb = mix(uEdgeColor, diffuseColor.rgb, edgeFactor);\ndiffuseColor.a *= edgeFactor;\n#include <output_fragment>'
+    );
+
+    if (typeof originalCompile === 'function'){
+      originalCompile(shader);
+    }
+  };
+  material.needsUpdate = true;
+  const wrapper = {
+    setProgress(value){ uniforms.uDissolveProgress.value = value; },
+    dispose(){
+      material.onBeforeCompile = originalCompile || function(){};
+      material.needsUpdate = true;
+      delete material.userData.dissolveWrapper;
+    }
+  };
+  material.userData.dissolveWrapper = wrapper;
+  return wrapper;
+}
+
+function prepareDissolveForObject(object, opts={}){
+  const wrappers = [];
+  if (!object) return wrappers;
+  object.traverse(child=>{
+    if (child.isMesh){
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach(mat=>{
+        const wrapper = wrapMaterialWithDissolve(mat, opts);
+        if (wrapper && !wrappers.includes(wrapper)) wrappers.push(wrapper);
+      });
+    }
+  });
+  return wrappers;
+}
+
+function applyPedestalToItem(item){
+  if (!pedestalTemplate || !item?.pedestal) return;
+  if (item.pedestalMixer){
+    item.pedestalMixer.stopAllAction();
+    const idx = mixers.indexOf(item.pedestalMixer);
+    if (idx !== -1) mixers.splice(idx, 1);
+    item.pedestalMixer = null;
+  }
+  item.pedestal.clear();
+  const clone = cloneDeep(pedestalTemplate);
+  if (!clone) return;
+  clone.scale.multiplyScalar(PEDESTAL_SCALE);
+  applyEnvParams(clone);
+  clone.traverse(node=>{
+    if (node.isMesh){
+      node.castShadow = true;
+      node.receiveShadow = true;
+    }
+  });
+  item.pedestal.add(clone);
+
+  if (pedestalClips.length){
+    const mixer = new THREE.AnimationMixer(clone);
+    pedestalClips.forEach(clip=>{
+      const action = mixer.clipAction(clip);
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.play();
+    });
+    mixers.push(mixer);
+    item.pedestalMixer = mixer;
+  }
+}
+
+
+for (let i=0; i<N; i++){
+  const root = new THREE.Group();
+  const base = new THREE.Group();
+  root.add(base);
+  const content = new THREE.Group();
+  base.add(content);
+
+  const s = slot(i);
+  root.position.copy(s.pos);
+  root.rotation.y = s.rotY;
+  // Initial tilt for every item around X axis (+15 degrees)
+  root.rotation.x = THREE.MathUtils.degToRad(15);
+  root.scale.setScalar(s.scale);
+
+  // Р С—Р В»Р ВµР в„–РЎРѓРЎвЂ¦Р С•Р В»Р Т‘Р ВµРЎР‚
+  const ph = new THREE.Mesh(placeholderGeo, placeholderMat);
+  ph.castShadow = true; ph.receiveShadow = true;
+  applyEnvParams(ph);
+  content.add(ph);
+
+  const pedestal = new THREE.Group();
+  pedestal.position.set(0, PEDESTAL_OFFSET_Y, 0);
+  root.add(pedestal);
+
+  // РЎвЂ¦Р С•РЎвЂљР С—Р С•Р С‘Р Р…РЎвЂљ DOM
+  center.add(root);
+  const itemState = { root, base, content, pedestal, pedestalMixer: null, autoSpinTween: null, focusBaseScale: null, placeholder: ph, swayPhase: Math.random()*Math.PI*2, hotY: 0.25 }; // hotY РЎС“РЎвЂљР С•РЎвЂЎР Р…Р С‘Р С Р С—Р С•РЎРѓР В»Р Вµ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С”Р С‘
+  items.push(itemState);
+  if (pedestalTemplate) applyPedestalToItem(itemState);
+}
+
+updateSpotlightForFront();
+
+// Р вЂ”Р В°Р С–РЎР‚РЎС“Р В·Р С”Р В° GLB Р С‘ Р Р…Р С•РЎР‚Р СР В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ
+const loader = gltfLoader; // reuse loader instance
+
+loader.load('pedestal.glb', (gltf)=>{
+  pedestalTemplate = gltf.scene || gltf.scenes?.[0];
+  if (!pedestalTemplate) return;
+  pedestalClips = gltf.animations || [];
+  pedestalTemplate.traverse(node=>{
+    if (node.isMesh){
+      node.castShadow = true;
+      node.receiveShadow = true;
+    }
+  });
+  items.forEach(applyPedestalToItem);
+}, undefined, (err)=>console.warn('pedestal.glb error', err));
+
+function addBoxAsset({ url, name, position, rotationYDeg, scale }){
+  const group = new THREE.Group();
+  group.name = name;
+  group.position.set(position[0], position[1], position[2]);
+  group.rotation.y = THREE.MathUtils.degToRad(rotationYDeg);
+  group.scale.setScalar(scale);
+  scene.add(group);
+
+  loader.load(url, (gltf)=>{
+    const obj = gltf.scene || gltf.scenes?.[0];
+    if (!obj) return;
+    const dims = normalizeBottomCenter(obj, 1.0);
+    applyEnvParams(obj);
+    group.clear();
+    group.add(obj);
+  }, undefined, (err)=>console.warn('box asset load error:', url, err));
+}
+
+addBoxAsset({ url:'box.glb',  name:'boxGlb',  position:[0, -0.9, -1.15], rotationYDeg:0, scale:5 });
+addBoxAsset({ url:'box2.glb', name:'box2Glb', position:[0, -0.9, -1.15], rotationYDeg:0, scale:5 });
+
+function normalizeBottomCenter(obj, target=0.2){
+  const bbox = new THREE.Box3();
+  obj.updateMatrixWorld(true);
+  obj.traverse(n=>{
+    if (n.isMesh && n.geometry){
+      n.updateWorldMatrix(true,false);
+      bbox.expandByObject(n);
+      n.castShadow = true; n.receiveShadow = true;
+    }
+  });
+  const size = new THREE.Vector3(); bbox.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const scale = target / maxDim;
+  obj.scale.setScalar(scale);
+
+  // Р С—Р ВµРЎР‚Р ВµРЎРѓРЎвЂЎРЎвЂРЎвЂљ
+  const bbox2 = new THREE.Box3(); obj.updateMatrixWorld(true);
+  obj.traverse(n=>{ if(n.isMesh && n.geometry){ n.updateWorldMatrix(true,false); bbox2.expandByObject(n); } });
+
+  const centerX = (bbox2.min.x + bbox2.max.x)/2;
+  const centerZ = (bbox2.min.z + bbox2.max.z)/2;
+  const minY    = bbox2.min.y;
+  obj.position.x -= centerX;
+  obj.position.z -= centerZ;
+  obj.position.y -= minY;
+
+  return { width:(bbox2.max.x-bbox2.min.x), height:(bbox2.max.y-bbox2.min.y), depth:(bbox2.max.z-bbox2.min.z) };
+}
+
+// Center the object's pivot at its geometric center (for true 3-axis rotation)
+function normalizeCenter(obj, target=0.2){
+  const bbox = new THREE.Box3();
+  obj.updateMatrixWorld(true);
+  obj.traverse(n=>{
+    if (n.isMesh && n.geometry){
+      n.updateWorldMatrix(true,false);
+      bbox.expandByObject(n);
+      n.castShadow = true; n.receiveShadow = true;
+    }
+  });
+  const size = new THREE.Vector3(); bbox.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const scale = target / maxDim;
+  obj.scale.setScalar(scale);
+
+  // recalc bbox post-scale, then move geometric center to origin
+  const bbox2 = new THREE.Box3(); obj.updateMatrixWorld(true);
+  obj.traverse(n=>{ if(n.isMesh && n.geometry){ n.updateWorldMatrix(true,false); bbox2.expandByObject(n); } });
+  const center = bbox2.getCenter(new THREE.Vector3());
+  obj.position.sub(center);
+
+  return { width:(bbox2.max.x-bbox2.min.x), height:(bbox2.max.y-bbox2.min.y), depth:(bbox2.max.z-bbox2.min.z) };
+}
+
+files.forEach((f, i)=>{
+  loader.load(
+    f,
+    (gltf)=>{
+      const obj = gltf.scene || gltf.scenes?.[0];
+      const dims = normalizeCenter(obj, 0.2);
+      applyEnvParams(obj);
+      // Wrap model into a controllable group so we can rotate/scale
+      const userGroup = new THREE.Group();
+      userGroup.name = 'userGroup';
+      userGroup.add(obj);
+      const content = items[i].content;
+      if (content){
+        content.clear();
+        content.add(userGroup);
+      }
+      if (i === 0) updateSpotlightForFront();
+      // Per-item control state
+      items[i].userGroup = userGroup;
+      items[i].userRotX = 0;
+      items[i].userRotY = 0;
+      items[i].userScale = 1;
+      items[i].userRotZ = 0;
+      // Try to find a named anchor inside the GLB (e.g., Hotspot1 / Hotspot)
+      let anchor = obj.getObjectByName('Hotspot1') || obj.getObjectByName('Hotspot');
+      if (!anchor){ obj.traverse(n=>{ if (!anchor && typeof n.name === 'string' && /^Hotspot/i.test(n.name)) anchor = n; }); }
+      items[i].anchor = anchor || null;
+      // РЎвЂ¦Р С•РЎвЂљР С—Р С•Р С‘Р Р…РЎвЂљ Р Р…Р В° Р Р†Р ВµРЎР‚РЎвЂ¦РЎС“РЎв‚¬Р С”РЎС“ + 0.1
+      items[i].hotY = Math.max(0.18, (dims.height * 0.5) + 0.10);
+      // Р С—Р С•Р Т‘Р С—Р С‘РЎв‚¬Р ВµР С Р Т‘Р В°Р Р…Р Р…РЎвЂ№Р Вµ Р Т‘Р В»РЎРЏ Р СР С•Р Т‘Р В°Р В»Р С”Р С‘
+      items[i].meta = {
+        title: `Р С›Р В±РЎР‰Р ВµР С”РЎвЂљ: ${f}`,
+        desc: `Р В­РЎвЂљР С• Р Р†РЎРѓР С—Р В»РЎвЂ№Р Р†Р В°РЎР‹РЎвЂ°Р ВµР Вµ Р С•Р С”Р Р…Р С• Р Т‘Р В»РЎРЏ ${f}. Р вЂ”Р Т‘Р ВµРЎРѓРЎРЉ Р СР С•Р В¶Р Р…Р С• Р С—Р С•Р С”Р В°Р В·Р В°РЎвЂљРЎРЉ Р С•Р С—Р С‘РЎРѓР В°Р Р…Р С‘Р Вµ, Р С”Р Р…Р С•Р С—Р С”Р С‘, РЎвЂ Р ВµР Р…РЎС“, CTA Р С‘ РЎвЂљ.Р Т‘.`
+      };
+    },
+    undefined,
+    (err)=>{ console.warn('GLB load error:', f, err); }
+  );
+});
+
+// --- CTA-driven QR reveal setup
+let qrTemplate = null;
+let qrHolder = null;
+
+const CTA_BLUE = new THREE.Color(0x58c7ff);
+const CTA_ORANGE = new THREE.Color(0xff8b3b);
+const CTA_CENTER = new THREE.Vector3(0, 0.99, 0);
+const CTA_QR_POSITION = new THREE.Vector3(0, 0.32, 0);
+const CTA_QR_SCALE = 3;
+
+function spawnParticleFieldFromBox(box, { color, emissiveIntensity = 3, count = 220, size = 0.018, life = 3, gravity = new THREE.Vector3(), velocityFactory } = {}){
+  if (!box || !Number.isFinite(box.min.x) || !Number.isFinite(box.max.x)) return null;
+  const geometry = new THREE.SphereGeometry(size, 6, 6);
+  const material = new THREE.MeshStandardMaterial({
+    color: color ?? 0xffffff,
+    emissive: color ?? 0xffffff,
+    emissiveIntensity,
+    metalness: 0.2,
+    roughness: 0.4,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false
+  });
+  const particles = new THREE.InstancedMesh(geometry, material, count);
+  particles.name = 'CTA_Particles';
+  particles.frustumCulled = false;
+  scene.add(particles);
+
+  const positions = new Array(count);
+  const velocities = new Array(count);
+  const min = box.min, max = box.max;
+  for (let i=0; i<count; i++){
+    const pos = new THREE.Vector3(
+      THREE.MathUtils.lerp(min.x, max.x, Math.random()),
+      THREE.MathUtils.lerp(min.y, max.y, Math.random()),
+      THREE.MathUtils.lerp(min.z, max.z, Math.random())
+    );
+    const vel = velocityFactory
+      ? velocityFactory(pos.clone())
+      : new THREE.Vector3(
+          (Math.random()-0.5) * 0.6,
+          Math.random()*1.2 + 0.6,
+          (Math.random()-0.5) * 0.6
+        );
+    positions[i] = pos;
+    velocities[i] = vel;
+    tmpMatrix4.makeTranslation(pos.x, pos.y, pos.z);
+    particles.setMatrixAt(i, tmpMatrix4);
+  }
+  particles.instanceMatrix.needsUpdate = true;
+  particles.userData = {
+    positions,
+    velocities,
+    gravity: gravity.clone ? gravity.clone() : new THREE.Vector3(),
+    age: 0,
+    lifespan: life,
+    fade: true,
+    type: 'instanced'
+  };
+  particleSystems.push(particles);
+  return particles;
+}
+
+const tmpDissolvePosition = new THREE.Vector3();
+const tmpDissolveVelocity = new THREE.Vector3();
+
+function spawnSurfaceDissolveParticles(root, { color, count = 900, speedRange = [1.0, 2.0], spread = 0.45, lifespan = 3.0 } = {}){
+  if (!root) return null;
+  root.updateMatrixWorld(true);
+  const meshes = [];
+  root.traverse(child=>{ if (child.isMesh) meshes.push(child); });
+  if (!meshes.length) return null;
+
+  let remaining = count;
+  const sampledPositions = [];
+  const velocityValues = [];
+  meshes.forEach((mesh, index)=>{
+    if (remaining <= 0) return;
+    const geometry = mesh.geometry;
+    if (!geometry || !geometry.attributes?.position) return;
+    const posAttr = geometry.attributes.position;
+    const total = posAttr.count;
+    const samples = Math.min(total, Math.max(1, Math.ceil(remaining / Math.max(1, meshes.length - index))));
+    const matrixWorld = mesh.matrixWorld;
+    for (let i=0; i<samples; i++){
+      const id = Math.floor(Math.random() * total);
+      tmpDissolvePosition.fromBufferAttribute(posAttr, id);
+      tmpDissolvePosition.applyMatrix4(matrixWorld);
+      sampledPositions.push(tmpDissolvePosition.x, tmpDissolvePosition.y, tmpDissolvePosition.z);
+
+      const speed = THREE.MathUtils.lerp(speedRange[0], speedRange[1], Math.random());
+      tmpDissolveVelocity.set(
+        (Math.random()-0.5) * spread,
+        speed,
+        (Math.random()-0.5) * spread
+      );
+      velocityValues.push(tmpDissolveVelocity.x, tmpDissolveVelocity.y, tmpDissolveVelocity.z);
+    }
+    remaining -= samples;
+  });
+
+  if (!sampledPositions.length) return null;
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(sampledPositions, 3));
+
+  const material = new THREE.PointsMaterial({
+    color: new THREE.Color(color ?? 0xffffff),
+    size: 0.02,
+    transparent: true,
+    opacity: 1,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true
+  });
+
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  scene.add(points);
+
+  const positionVecs = [];
+  const velocityVecs = [];
+  for (let i=0; i<sampledPositions.length; i+=3){
+    positionVecs.push(new THREE.Vector3(sampledPositions[i], sampledPositions[i+1], sampledPositions[i+2]));
+    velocityVecs.push(new THREE.Vector3(velocityValues[i], velocityValues[i+1], velocityValues[i+2]));
+  }
+
+  points.userData = {
+    positions: positionVecs,
+    velocities: velocityVecs,
+    gravity: new THREE.Vector3(0, 0.6, 0),
+    age: 0,
+    lifespan: lifespan,
+    fade: true,
+    type: 'points',
+    attribute: geometry.getAttribute('position')
+  };
+  particleSystems.push(points);
+  return points;
+}
+
+function triggerDissolveGroup(target, { edgeColor = 0xffffff, particleColor = 0xffffff, duration = 1600, noiseScale = 0.8, edgeWidth = DISSOLVE_DEFAULT_EDGE_WIDTH, particleCount = 900, onComplete } = {}){
+  if (!target) return;
+  target.updateMatrixWorld(true);
+  const wrappers = prepareDissolveForObject(target, { edgeColor, noiseScale, edgeWidth });
+  if (!wrappers.length){
+    target.visible = false;
+    if (onComplete) onComplete();
+    return;
+  }
+  spawnSurfaceDissolveParticles(target, {
+    color: particleColor,
+    count: particleCount,
+    speedRange: [1.0, 2.2],
+    spread: 0.55,
+    lifespan: 3.2
+  });
+
+  const state = { progress: 0 };
+  new TWEEN.Tween(state).to({ progress: 1.05 }, duration)
+    .easing(Easing.Cubic.In)
+    .onUpdate(()=>{ wrappers.forEach(w=>w.setProgress(state.progress)); })
+    .onComplete(()=>{
+      wrappers.forEach(w=>w.setProgress(1.2));
+      target.visible = false;
+      if (onComplete) onComplete();
+    })
+    .start();
+}
+
+function dissolveItemContent(item, frontRef = null){
+  if (!item?.content) return;
+  triggerDissolveGroup(item.content, {
+    edgeColor: CTA_BLUE,
+    particleColor: CTA_BLUE,
+    duration: 1700,
+    noiseScale: 0.9,
+    particleCount: 1100,
+    onComplete: ()=>{
+      if (item.base) item.base.visible = false;
+      const front = frontRef ?? items[0];
+      if (item.root && item !== front) item.root.visible = false;
+    }
+  });
+  if (item.placeholder) item.placeholder.visible = false;
+}
+
+function dissolvePedestal(item){
+  if (!item?.pedestal || !item.pedestal.visible) return;
+  if (item.pedestalMixer){
+    item.pedestalMixer.stopAllAction();
+    const idx = mixers.indexOf(item.pedestalMixer);
+    if (idx !== -1) mixers.splice(idx, 1);
+    item.pedestalMixer = null;
+  }
+  triggerDissolveGroup(item.pedestal, {
+    edgeColor: CTA_ORANGE,
+    particleColor: CTA_ORANGE,
+    duration: 1500,
+    noiseScale: 1.1,
+    particleCount: 900,
+    onComplete: ()=>{ item.pedestal.visible = false; }
+  });
+}
+
+function focusFrontItem(item){
+  if (!item?.root) return;
+  const root = item.root;
+  root.rotation.z = 0;
+  updateSpotlightForFront();
+
+  if (item.autoSpinTween){
+    item.autoSpinTween.stop();
+    item.autoSpinTween = null;
+  }
+
+  const duration = 1000;
+  const startPos = { x: root.position.x, y: root.position.y, z: root.position.z };
+  const targetPos = { x: 0, y: CTA_CENTER.y, z: 0 };
+  new TWEEN.Tween(startPos).to(targetPos, duration).easing(Easing.Sinusoidal.InOut)
+    .onUpdate(()=>{ root.position.set(startPos.x, startPos.y, startPos.z); })
+    .onComplete(()=>{ root.position.set(targetPos.x, targetPos.y, targetPos.z); })
+    .start();
+
+  const baseScale = item.focusBaseScale ?? root.scale.x;
+  item.focusBaseScale = baseScale;
+  const scaleState = { s: root.scale.x };
+  const targetScale = baseScale * 3.0;
+  new TWEEN.Tween(scaleState).to({ s: targetScale }, duration).easing(Easing.Sinusoidal.InOut)
+    .onUpdate(()=>{ root.scale.setScalar(scaleState.s); })
+    .onComplete(()=>{ root.scale.setScalar(targetScale); })
+    .start();
+
+  const orientState = { x: root.rotation.x, y: root.rotation.y };
+  const startSpin = ()=>{
+    const state = { y: root.rotation.y };
+    const tween = new TWEEN.Tween(state)
+      .to({ y: state.y + Math.PI * 2 }, 10000)
+      .easing(Easing.Linear.None)
+      .onUpdate(()=>{ root.rotation.y = state.y; })
+      .onComplete(()=>{
+        item.autoSpinTween = null;
+        root.rotation.y = THREE.MathUtils.euclideanModulo(root.rotation.y, Math.PI * 2);
+        startSpin();
+      })
+      .start();
+    item.autoSpinTween = tween;
+  };
+
+  new TWEEN.Tween(orientState).to({ x: 0, y: 0 }, duration).easing(Easing.Sinusoidal.InOut)
+    .onUpdate(()=>{
+      root.rotation.x = orientState.x;
+      root.rotation.y = orientState.y;
+    })
+    .onComplete(()=>{
+      root.rotation.x = 0;
+      root.rotation.y = THREE.MathUtils.euclideanModulo(root.rotation.y, Math.PI * 2);
+      root.rotation.y = 0;
+      startSpin();
+    })
+    .start();
+}
+
+function animateFrontItemForCheckout(item){
+  if (!item?.root) return;
+  const root = item.root;
+  root.rotation.z = 0;
+  if (item.autoSpinTween){ item.autoSpinTween.stop(); item.autoSpinTween = null; }
+
+  const duration = 1200;
+  const targetPos = { x: 0, y: CTA_CENTER.y, z: 0 };
+  const posState = { x: root.position.x, y: root.position.y, z: root.position.z };
+  new TWEEN.Tween(posState).to(targetPos, duration).easing(Easing.Cubic.InOut)
+    .onUpdate(()=>{
+      root.position.set(posState.x, posState.y, posState.z);
+      updateSpotlightForFront();
+    })
+    .onComplete(()=>{
+      root.position.set(targetPos.x, targetPos.y, targetPos.z);
+      updateSpotlightForFront();
+    })
+    .start();
+
+  const startRotY = root.rotation.y;
+  const rotState = { x: root.rotation.x, y: startRotY };
+  const targetRotY = startRotY + Math.PI;
+  const startScale = root.scale.x;
+  const scaleState = { s: startScale };
+  new TWEEN.Tween(rotState).to({ x: 0, y: targetRotY }, duration).easing(Easing.Cubic.InOut)
+    .onUpdate(()=>{
+      root.rotation.x = rotState.x;
+      root.rotation.y = rotState.y;
+      const t = THREE.MathUtils.clamp((rotState.y - startRotY) / (targetRotY - startRotY), 0, 1);
+      scaleState.s = THREE.MathUtils.lerp(startScale, startScale * 1.4, t);
+      root.scale.setScalar(scaleState.s);
+      updateSpotlightForFront();
+    })
+    .onComplete(()=>{
+      root.rotation.x = 0;
+      root.rotation.y = THREE.MathUtils.euclideanModulo(targetRotY, Math.PI * 2);
+      root.scale.setScalar(startScale * 1.4);
+      updateSpotlightForFront();
+    })
+    .start();
+}
+
+function revealQrCard(){
+  if (!qrTemplate) return;
+  const pos = CTA_QR_POSITION.clone();
+  const box = new THREE.Box3().setFromCenterAndSize(pos.clone(), new THREE.Vector3(0.7, 0.7, 0.7));
+  spawnParticleFieldFromBox(box, {
+    color: CTA_BLUE,
+    emissiveIntensity: 3,
+    count: 240,
+    size: 0.02,
+    life: 2.6,
+    gravity: new THREE.Vector3(0, 0.35, 0),
+    velocityFactory: ()=>new THREE.Vector3(
+      (Math.random()-0.5)*0.4,
+      Math.random()*0.8 + 0.6,
+      (Math.random()-0.5)*0.4
+    )
+  });
+  setTimeout(()=>{
+    if (qrHolder){ scene.remove(qrHolder); }
+    const qrClone = cloneDeep(qrTemplate);
+    if (!qrClone) return;
+    applyEnvParams(qrClone);
+    qrHolder = new THREE.Group();
+    qrHolder.name = 'CTA_QR_Holder';
+    qrHolder.position.copy(pos);
+    qrHolder.scale.setScalar(0.01);
+    qrHolder.add(qrClone);
+    scene.add(qrHolder);
+    const fadeMats = [];
+    qrClone.traverse(node=>{
+      if (node.isMesh){
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach(mat=>{
+          if (!mat) return;
+          mat.transparent = true;
+          mat.opacity = 0;
+          fadeMats.push(mat);
+        });
+      }
+    });
+    const scaleState = { s: 0.01 };
+    new TWEEN.Tween(scaleState).to({ s: CTA_QR_SCALE }, 800).easing(Easing.Sinusoidal.InOut)
+      .onUpdate(()=>{ qrHolder.scale.setScalar(scaleState.s); })
+      .start();
+    const rotState = { y: 0 };
+    new TWEEN.Tween(rotState).to({ y: Math.PI * 2 }, 1600)
+      .easing(Easing.Sinusoidal.InOut)
+      .onUpdate(()=>{ qrHolder.rotation.y = rotState.y; })
+      .start();
+    const fadeState = { o: 0 };
+    new TWEEN.Tween(fadeState).to({ o: 1 }, 800).easing(Easing.Sinusoidal.InOut)
+      .delay(200)
+      .onUpdate(()=>{ fadeMats.forEach(m=>{ m.opacity = fadeState.o; }); })
+      .start();
+  }, 600);
+}
+
+function startCheckoutSequence(){
+  if (ctaTriggered) return;
+  bumpIdle();
+  ctaTriggered = true;
+  swayEnabled = false;
+  if (ctaButton){
+    ctaButton.disabled = true;
+    ctaButton.classList.remove('show');
+  }
+  const frontItem = items[0];
+  for (const item of items){
+    dissolvePedestal(item);
+    if (item !== frontItem) dissolveItemContent(item, frontItem);
+    item.base.rotation.set(0,0,0);
+    item.base.position.set(0,0,0);
+  }
+  if (frontItem){
+    if (frontItem.placeholder) frontItem.placeholder.visible = false;
+    animateFrontItemForCheckout(frontItem);
+  }
+  revealQrCard();
+}
+
+if (ctaButton){
+  ctaButton.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    startCheckoutSequence();
+  });
+}
+
+loader.load('qr.glb', (g)=>{
+  qrTemplate = g.scene || g.scenes?.[0] || null;
+  if (!qrTemplate) return;
+  normalizeBottomCenter(qrTemplate, 0.24);
+  applyEnvParams(qrTemplate);
+}, undefined, (err)=>console.warn('qr.glb error', err));
+
+function updateParticles(dt){
+  if (!particleSystems.length) return;
+  for (let i = particleSystems.length - 1; i >= 0; i--){
+    const obj = particleSystems[i];
+    const data = obj.userData || {};
+    data.age = (data.age || 0) + dt;
+    const type = data.type || (obj.isInstancedMesh ? 'instanced' : obj.isPoints ? 'points' : 'other');
+
+    if (type === 'instanced' && obj.isInstancedMesh){
+      const positions = data.positions || [];
+      const velocities = data.velocities || [];
+      const gravity = data.gravity || new THREE.Vector3();
+      for (let j=0; j<positions.length; j++){
+        const vel = velocities[j];
+        if (!vel) continue;
+        vel.addScaledVector(gravity, dt);
+        const pos = positions[j];
+        pos.addScaledVector(vel, dt);
+        tmpMatrix4.makeTranslation(pos.x, pos.y, pos.z);
+        obj.setMatrixAt(j, tmpMatrix4);
+      }
+      obj.instanceMatrix.needsUpdate = true;
+      if (data.fade && obj.material && obj.material.opacity !== undefined){
+        const opacity = Math.max(0, 1 - data.age / (data.lifespan || 1));
+        obj.material.opacity = opacity;
+        obj.material.transparent = true;
+      }
+    } else if (type === 'points' && obj.isPoints){
+      const positions = data.positions || [];
+      const velocities = data.velocities || [];
+      const gravity = data.gravity || new THREE.Vector3();
+      const attr = data.attribute || obj.geometry?.getAttribute('position');
+      if (attr){
+        for (let j=0; j<positions.length; j++){
+          const vel = velocities[j];
+          if (!vel) continue;
+          vel.addScaledVector(gravity, dt);
+          const pos = positions[j];
+          pos.addScaledVector(vel, dt);
+          const idx = j * 3;
+          attr.array[idx] = pos.x;
+          attr.array[idx + 1] = pos.y;
+          attr.array[idx + 2] = pos.z;
+        }
+        attr.needsUpdate = true;
+      }
+      if (data.fade && obj.material && obj.material.opacity !== undefined){
+        obj.material.opacity = Math.max(0, 1 - data.age / (data.lifespan || 1));
+        obj.material.transparent = true;
+      }
+    }
+
+    if (data.age >= (data.lifespan || 1)){
+      scene.remove(obj);
+      obj.geometry?.dispose?.();
+      if (Array.isArray(obj.material)) obj.material.forEach(m=>m.dispose()); else obj.material?.dispose?.();
+      particleSystems.splice(i, 1);
+    }
+  }
+}
+// --- Р С›РЎвЂЎР ВµРЎР‚Р ВµР Т‘РЎРЉ РЎРѓР Р†Р В°Р в„–Р С—Р С•Р Р† (Р В±Р ВµРЎРѓР С”Р С•Р Р…Р ВµРЎвЂЎР Р…Р В°РЎРЏ Р С—РЎР‚Р С•Р С”РЎР‚РЎС“РЎвЂљР С”Р В°)
+let animating = false;
+// Ensure at most one rotation per gesture: ignore extra requests while animating
+let queued = 0; // kept for compatibility, but not used to chain moves anymore
+
+function rotateOnce(dir){
+  if (ctaTriggered) return;
+  if (!introDone) { runIntro(); return; }
+  // If an animation is in progress, ignore further rotate requests
+  if (animating){ return; }
+  animating = true;
+
+  const from = [], to = [];
+  for (let i=0; i<N; i++){
+    const r = items[i].root;
+    from.push({ pos:r.position.clone(), rotY:r.rotation.y, scale:r.scale.x });
+    to.push(slot((i + dir + N) % N));
+  }
+
+  const u = { t:0 };
+  new TWEEN.Tween(u)
+    .to({ t:1 }, ANIM_MS)
+    .easing(Easing.Cubic.InOut)
+    .onUpdate(()=>{
+      for (let i=0; i<N; i++){
+        const r = items[i].root, a = from[i], b = to[i];
+        r.position.lerpVectors(a.pos, b.pos, u.t);
+        r.rotation.y = THREE.MathUtils.lerp(a.rotY, b.rotY, u.t);
+        r.scale.setScalar(THREE.MathUtils.lerp(a.scale, b.scale, u.t));
+      }
+    })
+    .onComplete(()=>{
+      if (dir === +1){ items.unshift(items.pop()); }
+      else { items.push(items.shift()); }
+      animating = false;
+      // Do not auto-chain queued moves: enforce single-step per gesture
+      queued = 0;
+      updateSpotlightForFront();
+    })
+    .start();
+}
+
+// --- Р вЂ“Р ВµРЎРѓРЎвЂљРЎвЂ№
+let isDown=false, startX=0, lastX=0, startY=0, lastY=0;
+const SWIPE_PX = 40;
+const raycaster = new THREE.Raycaster();
+const mouseNdc = new THREE.Vector2();
+// Multi-touch tracking for pinch (scale) and twist (Z-rotation)
+const activePointers = new Map(); // pointerId -> {x,y,type}
+let pinchActive = false;
+const pinchStart = { dist:0, angle:0, scale:1, rotZ:0 };
+let pinchIsTouch = false; // true when handling a mobile touch pinch
+
+// Occlusion test: check if a world-space point is hidden by the front item
+function isOccludedByFront(worldPoint, targetIndex){
+  if (!items[0] || targetIndex === 0) return false;
+  const dir = worldPoint.clone().sub(camera.position);
+  const dist = dir.length();
+  if (dist <= 0.0001) return false;
+  dir.normalize();
+  raycaster.set(camera.position, dir);
+  const hits = raycaster.intersectObject(items[0].root, true);
+  if (hits && hits.length){
+    const d = hits[0].distance || Infinity;
+    return d < (dist - 0.005);
+  }
+  return false;
+}
+
+function getTwoPointerMetrics(){
+  const it = activePointers.values();
+  const a = it.next().value; const b = it.next().value;
+  if (!a || !b) return null;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const angle = Math.atan2(dy, dx);
+  return { dist, angle, aType:a.type, bType:b.type };
+}
+
+function rotateBy(steps){
+  if (ctaTriggered) return;
+  if (!introDone) { runIntro(); return; }
+  const k = Math.trunc(steps);
+  if (!k) return;
+  if (animating){ return; }
+  animating = true;
+  queued = 0;
+
+  const from = [], to = [];
+  for (let i=0; i<N; i++){
+    const r = items[i].root;
+    from.push({ pos:r.position.clone(), rotY:r.rotation.y, scale:r.scale.x });
+    to.push(slot((i + k % N + N) % N));
+  }
+
+  const u = { t:0 };
+  new TWEEN.Tween(u)
+    .to({ t:1 }, Math.abs(k) * ANIM_MS)
+    .easing(Easing.Cubic.InOut)
+    .onUpdate(()=>{
+      for (let i=0; i<N; i++){
+        const r = items[i].root, a = from[i], b = to[i];
+        r.position.lerpVectors(a.pos, b.pos, u.t);
+        r.rotation.y = THREE.MathUtils.lerp(a.rotY, b.rotY, u.t);
+        r.scale.setScalar(THREE.MathUtils.lerp(a.scale, b.scale, u.t));
+      }
+    })
+    .onComplete(()=>{
+      const stepsAbs = Math.abs(k);
+      if (k > 0){ for (let s=0; s<stepsAbs; s++) items.unshift(items.pop()); }
+      else { for (let s=0; s<stepsAbs; s++) items.push(items.shift()); }
+      animating = false;
+      updateSpotlightForFront();
+    })
+    .start();
+}
+
+function rotateToIndex(targetIdx){
+  if (targetIdx <= 0) return; // already front or invalid
+  const leftSteps = targetIdx;
+  const rightSteps = N - targetIdx;
+  const dir = (leftSteps <= rightSteps) ? -1 : +1;
+  const steps = Math.min(leftSteps, rightSteps);
+  rotateBy(dir * steps);
+}
+
+// --- Idle reset: return ring and objects to initial state after inactivity
+const IDLE_MS = 10000000; // 10000 seconds
+let idleTimer = null;
+function bumpIdle(){
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(()=>{ onIdle(); }, IDLE_MS);
+}
+function onIdle(){ resetToInitial(true); }
+
+function resetToInitial(animated=true){
+  if (!introDone) return;
+  if (animating) return; // avoid clobbering ongoing animation
+  animating = true;
+  if (typeof hidePlaque === 'function') hidePlaque();
+
+  const from = [], to = [];
+  for (let i=0; i<N; i++){
+    const r = items[i].root;
+    from.push({ pos:r.position.clone(), rotY:r.rotation.y, scale:r.scale.x });
+    // Map each current item to its original slot index using center.children order
+    const targetIndex = center.children.indexOf(r);
+    to.push(slot(targetIndex));
+  }
+
+  const u = { t:0 };
+  new TWEEN.Tween(u)
+    .to({ t:1 }, ANIM_MS * 1.5)
+    .easing(Easing.Cubic.InOut)
+    .onUpdate(()=>{
+      for (let i=0; i<N; i++){
+        const r = items[i].root, a = from[i], b = to[i];
+        r.position.lerpVectors(a.pos, b.pos, u.t);
+        r.rotation.y = THREE.MathUtils.lerp(a.rotY, b.rotY, u.t);
+        r.scale.setScalar(THREE.MathUtils.lerp(a.scale, b.scale, u.t));
+      }
+    })
+    .onComplete(()=>{
+      // Reorder items array so that the front slot is the original first item
+      items.sort((ia, ib)=> center.children.indexOf(ia.root) - center.children.indexOf(ib.root));
+      // Reset per-item user transforms to defaults
+      for (let i=0; i<N; i++){
+        const it = items[i];
+        if (it.userGroup){
+          it.userScale = 1; it.userRotX = 0; it.userRotY = 0; it.userRotZ = 0;
+          it.userGroup.scale.setScalar(1);
+          it.userGroup.rotation.set(0,0,0);
+        }
+      }
+      animating = false;
+      updateSpotlightForFront();
+      bumpIdle();
+    })
+    .start();
+}
+
+function pickAt(clientX, clientY){
+  const rect = canvas.getBoundingClientRect();
+  mouseNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+  raycaster.setFromCamera(mouseNdc, camera);
+  if (!introDone){
+    if (logoObj){
+      const hits = raycaster.intersectObject(logoObj, true);
+      if (hits && hits.length){ runIntro(); return true; }
+    }
+    return false;
+  }
+  const intersects = raycaster.intersectObjects(center.children, true);
+  for (const hit of intersects){
+    let node = hit.object;
+    let found = -1;
+    while (node){
+      for (let i=0; i<N; i++){
+        if (items[i].root === node || items[i].base === node){ found = i; break; }
+      }
+      if (found !== -1) break;
+      node = node.parent;
+    }
+    if (found > -1){ rotateToIndex(found); return true; }
+  }
+  return false;
+}
+// --- Front object rotation + scale controls ---
+// Front object rotation/scale controls
+let objControlActive = false;
+let objStartRotX = 0, objStartRotY = 0, objStartRotZ = 0;
+const ROT_SPEED = 0.005; // radians per pixel
+let dragIsTouch = false; // invert X-axis rotation on touch screens
+// Environment detection
+const IS_WINDOWS = navigator.userAgent.includes('Windows');
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+function isPointerOverFront(clientX, clientY){
+  if (!introDone || !items[0]) return false;
+  const rect = canvas.getBoundingClientRect();
+  mouseNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+  raycaster.setFromCamera(mouseNdc, camera);
+  const hits = raycaster.intersectObject(items[0].root, true);
+  return !!(hits && hits.length);
+}
+
+function applyFrontRotation(rx, ry, rz){
+  const it = items[0]; if (!it || !it.userGroup) return;
+  // Clamp X-axis rotation to [-90°, +90°]
+  const rxClamped = THREE.MathUtils.clamp(rx, -Math.PI/2, Math.PI/2);
+  it.userRotX = rxClamped;
+  it.userRotY = ry;
+  it.userRotZ = (it.userRotZ ?? 0);
+  if (typeof rz === 'number') it.userRotZ = rz;
+  it.userGroup.rotation.set(it.userRotX, it.userRotY, it.userRotZ);
+  updateSpotlightForFront();
+}
+
+function applyFrontScale(s){
+  const it = items[0]; if (!it || !it.userGroup) return;
+  it.userScale = THREE.MathUtils.clamp(s, 1, 2);
+  it.userGroup.scale.setScalar(it.userScale);
+  updateSpotlightForFront();
+}
+
+canvas.addEventListener('pointerdown', e=>{
+  bumpIdle();
+  canvas.setPointerCapture(e.pointerId);
+  isDown = true; startX = lastX = e.clientX; startY = lastY = e.clientY;
+  activePointers.set(e.pointerId, { x:e.clientX, y:e.clientY, type:e.pointerType });
+  dragIsTouch = (e.pointerType === 'touch');
+  const overFront = isPointerOverFront(e.clientX, e.clientY);
+  const it = items[0];
+  if (overFront || ctaTriggered){
+    objControlActive = true;
+    if (it){
+      objStartRotX = it.userRotX || 0;
+      objStartRotY = it.userRotY || 0;
+      objStartRotZ = it.userRotZ || 0;
+    } else {
+      objStartRotX = objStartRotY = objStartRotZ = 0;
+    }
+  } else {
+    objControlActive = false;
+  }
+  // Two-finger gesture: enter pinch mode only if over front object or CTA is active
+  if (activePointers.size === 2){
+    const m = getTwoPointerMetrics();
+    if (m){
+      const itp = activePointers.values();
+      const a = itp.next().value, b = itp.next().value;
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      if (ctaTriggered || isPointerOverFront(midX, midY)){
+        pinchActive = true;
+        pinchIsTouch = (m.aType === 'touch' || m.bType === 'touch') && IS_MOBILE && !IS_WINDOWS;
+        objControlActive = true;
+        const front = items[0] || {};
+        pinchStart.dist = m.dist;
+        pinchStart.angle = m.angle;
+        pinchStart.scale = front.userScale || 1;
+        pinchStart.rotZ  = front.userRotZ || 0;
+      }
+    }
+  }
+});
+canvas.addEventListener('pointermove', e=>{
+  bumpIdle();
+  if(isDown){
+    lastX = e.clientX; lastY = e.clientY;
+    activePointers.set(e.pointerId, { x:e.clientX, y:e.clientY, type:e.pointerType });
+    if (pinchActive && activePointers.size >= 2){
+      const m = getTwoPointerMetrics();
+      if (m){
+        e.preventDefault();
+        const it = items[0]; if (it && it.userGroup){
+          const scale = THREE.MathUtils.clamp(pinchStart.scale * (m.dist / (pinchStart.dist||1)), 1, 2);
+          applyFrontScale(scale);
+          if (pinchIsTouch){
+            // Mobile twist: invert Z-rotation relative to default
+            const dRaw = (m.angle - pinchStart.angle);
+            const dA = Math.atan2(Math.sin(dRaw), Math.cos(dRaw)); // shortest arc
+            const nextZ = (pinchStart.rotZ || 0) - dA; // inverted for mobile
+            applyFrontRotation(it.userRotX||0, it.userRotY||0, nextZ);
+          } else {
+            // Keep Windows and non-mobile behavior unchanged (no twist)
+            applyFrontRotation(it.userRotX||0, it.userRotY||0, it.userRotZ||0);
+          }
+        }
+      }
+      return;
+    }
+    if (objControlActive){
+      const dx = lastX - startX;
+      let dy = lastY - startY;
+      if (dragIsTouch) dy = -dy; // invert vertical -> X-axis rotation on touch
+      if (e.shiftKey){
+        // Shift-drag: roll around Z axis using horizontal movement
+        applyFrontRotation(objStartRotX, objStartRotY, objStartRotZ + dx*ROT_SPEED);
+      } else {
+        // Default: rotate around X (vertical drag) and Y (horizontal drag)
+        applyFrontRotation(objStartRotX + dy*ROT_SPEED, objStartRotY + dx*ROT_SPEED, objStartRotZ);
+      }
+    }
+  }
+});
+canvas.addEventListener('pointerup', (e)=>{
+  bumpIdle();
+  activePointers.delete(e.pointerId);
+  if (pinchActive && activePointers.size < 2){ pinchActive = false; pinchIsTouch = false; }
+  if(!isDown){ objControlActive = false; return; }
+  const dx = lastX - startX;
+  isDown = false;
+  if (ctaTriggered){
+    objControlActive = false;
+    return;
+  }
+  if (objControlActive){ objControlActive = false; return; }
+  if (Math.abs(dx) < SWIPE_PX){ pickAt(lastX, lastY); return; }
+  // Inverted Y-axis rotation for the ring
+  rotateOnce(dx < 0 ? -1 : +1);
+});
+canvas.addEventListener('pointercancel', (e)=>{
+  bumpIdle();
+  activePointers.delete(e.pointerId);
+  if (pinchActive && activePointers.size < 2){ pinchActive = false; pinchIsTouch = false; }
+  isDown = false;
+  if (ctaTriggered){ objControlActive = false; }
+});
+canvas.addEventListener('wheel', e=>{
+  bumpIdle();
+  // On Windows: wheel scales the front object (keep Shift+wheel for Z roll)
+  if (IS_WINDOWS){
+    if (e.shiftKey && isPointerOverFront(e.clientX, e.clientY)){
+      e.preventDefault();
+      const it = items[0];
+      const curZ = it?.userRotZ || 0;
+      const nextZ = curZ + (e.deltaY > 0 ? +1 : -1) * 0.08; // step roll
+      applyFrontRotation(it.userRotX||0, it.userRotY||0, nextZ);
+      return;
+    }
+    e.preventDefault();
+    const it = items[0];
+    const cur = it?.userScale || 1;
+    const next = cur * (e.deltaY > 0 ? 0.9 : 1.1);
+    applyFrontScale(next);
+    return;
+  }
+  // Non-Windows platforms: original behavior
+  // Ctrl + wheel over front item scales between 1x..2x
+  if (e.ctrlKey && isPointerOverFront(e.clientX, e.clientY)){
+    e.preventDefault();
+    const it = items[0];
+    const cur = it?.userScale || 1;
+    const next = cur * (e.deltaY > 0 ? 0.9 : 1.1);
+    applyFrontScale(next);
+    return;
+  }
+  // Shift + wheel over front item: roll around Z axis
+  if (e.shiftKey && isPointerOverFront(e.clientX, e.clientY)){
+    e.preventDefault();
+    const it = items[0];
+    const curZ = it?.userRotZ || 0;
+    const nextZ = curZ + (e.deltaY > 0 ? +1 : -1) * 0.08; // step roll
+    applyFrontRotation(it.userRotX||0, it.userRotY||0, nextZ);
+    return;
+  }
+  e.preventDefault();
+  // Inverted Y-axis rotation for the ring (wheel)
+  rotateOnce(e.deltaY>0 ? -1 : +1);
+}, {passive:false});
+// Double-click toggles front item scale 1x <-> 2x
+canvas.addEventListener('dblclick', (e)=>{
+  bumpIdle();
+  if (!isPointerOverFront(e.clientX, e.clientY)) return;
+  const it = items[0];
+  const next = (it?.userScale || 1) < 2 ? 2 : 1;
+  applyFrontScale(next);
+});
+window.addEventListener('keydown', e=>{
+  bumpIdle();
+  const handleObjectRoll = ()=>{
+    if (e.key==='q' || e.key==='Q'){
+      const it = items[0]; if (!it?.userGroup) return;
+      applyFrontRotation(it.userRotX||0, it.userRotY||0, (it.userRotZ||0) - 0.1);
+      return true;
+    }
+    if (e.key==='e' || e.key==='E'){
+      const it = items[0]; if (!it?.userGroup) return;
+      applyFrontRotation(it.userRotX||0, it.userRotY||0, (it.userRotZ||0) + 0.1);
+      return true;
+    }
+    return false;
+  };
+  if (ctaTriggered){
+    handleObjectRoll();
+    return;
+  }
+  // Inverted Y-axis rotation for the ring (arrows)
+  if (e.key==='ArrowLeft'){ rotateOnce(+1); return; }
+  if (e.key==='ArrowRight'){ rotateOnce(-1); return; }
+  handleObjectRoll();
+});
+
+// Hide plaque when clicking on empty space
+wrap.addEventListener('click', ()=>{ bumpIdle(); if (plaqueItem) hidePlaque(); });
+// Start intro on tap/click
+neonPress?.addEventListener('click', (e)=>{ bumpIdle(); e.stopPropagation(); runIntro(); });
+// Only logo click (or the "РќР°Р¶Р°С‚СЊ" button) starts intro
+
+// --- Р В Р ВµРЎРѓР В°Р в„–Р В·
+function resize(){
+  const r = wrap.getBoundingClientRect();
+  const w = Math.max(1, r.width), h = Math.max(1, r.height);
+  renderer.setSize(w, h, false);
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+new ResizeObserver(resize).observe(wrap);
+resize();
+
+// --- Р В Р В°Р В·Р СР ВµРЎвЂ°Р ВµР Р…Р С‘Р Вµ РЎвЂ¦Р С•РЎвЂљР С—Р С•Р С‘Р Р…РЎвЂљР С•Р Р†
+const tmpV = new THREE.Vector3();
+const tmpQ = new THREE.Quaternion();
+const tmpS = new THREE.Vector3();
+
+
+// --- Р СљР С•Р Т‘Р В°Р В»Р С”Р В°
+const modal = document.getElementById('modal');
+const modalTitle = document.getElementById('modalTitle');
+const modalDesc  = document.getElementById('modalDesc');
+modal.addEventListener('click', (e)=>{ if (e.target === modal) closeModal(); });
+modal.querySelector('.modal-close').addEventListener('click', closeModal);
+window.addEventListener('keydown', (e)=>{ if (e.key==='Escape') closeModal(); });
+
+function openModalForItem(item){
+  const meta = item.meta || { title:'Р С›Р В±РЎР‰Р ВµР С”РЎвЂљ', desc:'Р С›Р С—Р С‘РЎРѓР В°Р Р…Р С‘Р Вµ.' };
+  modalTitle.textContent = meta.title;
+  modalDesc.textContent  = meta.desc;
+  modal.classList.add('show');
+}
+function closeModal(){ modal.classList.remove('show'); }
+
+// --- Р’В«Р вЂ“Р С‘Р В·Р Р…РЎРЉР’В» Р В±Р ВµР В· Р С‘Р В·Р СР ВµР Р…Р ВµР Р…Р С‘РЎРЏ Р Р†РЎвЂ№РЎРѓР С•РЎвЂљРЎвЂ№
+const SWAY_ROT = 0.06, SWAY_POS = 0.03, SWAY_SPEED = 0.6;
+const clock = new THREE.Clock();
+let prevT = 0;
+function tick(){
+  const t = clock.getElapsedTime();
+  const dt = Math.max(0, t - prevT); prevT = t;
+  if (swayEnabled){
+    for (let i=0; i<N; i++){
+      const { base, swayPhase } = items[i];
+      base.rotation.x = Math.sin(t*SWAY_SPEED + swayPhase) * SWAY_ROT;
+      base.rotation.z = Math.cos(t*SWAY_SPEED + swayPhase) * (SWAY_ROT*0.6);
+      base.position.x = Math.sin(t*SWAY_SPEED*0.8 + swayPhase) * SWAY_POS;
+      base.position.z = Math.cos(t*SWAY_SPEED*0.8 + swayPhase) * (SWAY_POS*0.7);
+    }
+  }
+  for (const m of mixers) m.update(dt);
+  updateParticles(dt);
+  TWEEN.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+bumpIdle();
+</script>
+</body>
+</html>
+
+
+
+
+
+  <style>
+  /* Floating video (no backdrop, no frame) */
+  .modal-backdrop.float{ background:transparent !important; display:none; pointer-events:none; }
+  .modal-backdrop.float.show{ display:block; }
+  /* Static video modal: pinned at top center, no frame, no backdrop dim */
+  .modal-backdrop.no-backdrop{ background:transparent !important; }
+  .modal-box.video{ background:transparent !important; box-shadow:none !important; padding:0 !important; position:fixed; top:100px; left:50%; transform:translateX(-50%); pointer-events:auto; width:auto; }
+  .modal-box.video iframe{ width:min(430px, calc(100% - 0px)); aspect-ratio:16/9; height:auto; border:0; border-radius:12px; background:#000 }
+  .modal-close.video-close{ position:absolute; top:0px; right:-32px; width:24px; height:24px; border:none; border-radius:50%; background:rgba(0,0,0,.6); color:#fff; font-size:20px; line-height:1; cursor:pointer; }
+  </style>
